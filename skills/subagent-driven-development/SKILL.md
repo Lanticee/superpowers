@@ -185,7 +185,7 @@ implementation.
 
 Use the least powerful model that can handle each role to conserve cost and increase speed.
 
-**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): use a fast, cheap model. Most implementation tasks are mechanical when the plan is well-specified.
+**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): delegate to Gemini 3.5 Flash via the Antigravity CLI (`agy`) — see "Dispatching to Gemini 3.5 Flash via agy" below. Most implementation tasks are mechanical when the plan is well-specified. If `agy` is unavailable on this machine, fall back to the cheapest Claude model.
 
 **Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
 
@@ -210,13 +210,52 @@ many turns a subagent takes, and the cheapest models routinely take 2-3× the
 turns on multi-step work — costing more overall. Use a mid-tier model as the
 floor for reviewers and for implementers working from prose descriptions.
 When the task's plan text contains the complete code to write, the
-implementation is transcription plus testing: use the cheapest tier for
-that implementer. Single-file mechanical fixes also take the cheapest tier.
+implementation is transcription plus testing: dispatch that implementer to
+Gemini 3.5 Flash via agy. Single-file mechanical fixes also go to agy.
 
 **Task complexity signals (implementation tasks):**
-- Touches 1-2 files with a complete spec → cheap model
+- Touches 1-2 files with a complete spec → Gemini 3.5 Flash via agy (fallback: cheap model)
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
+
+## Dispatching to Gemini 3.5 Flash via agy
+
+For cheap-tier tasks, shell out to the Antigravity CLI instead of spawning a
+cheap Claude subagent. Check availability once per session with `command -v agy`.
+
+**Read-only tasks** (review a diff, analyze a file, summarize) need no flags:
+
+```bash
+agy --print "<self-contained prompt with file paths>" \
+  --model gemini-3.5-flash --print-timeout 5m < /dev/null
+```
+
+**Implementation tasks** (writing/editing files) additionally require the
+project directory registered as a workspace and permissions auto-approved:
+
+```bash
+agy --print "<task prompt>" --add-dir "<absolute project dir>" \
+  --dangerously-skip-permissions \
+  --model gemini-3.5-flash --print-timeout 10m < /dev/null
+```
+
+Rules for agy dispatch:
+
+- **Always redirect stdin from /dev/null** — agy hangs forever in non-TTY
+  environments otherwise.
+- The prompt must be fully self-contained: task spec, file paths, and the
+  complete code from the plan when it exists. agy shares no context with
+  your session.
+- `--dangerously-skip-permissions` is acceptable here because the task is
+  scoped, the plan is explicit, and every result goes through the normal
+  review loop before merging. Never use it for tasks touching secrets,
+  CI config, or anything outside the project directory.
+- agy leaves work artifacts (`gemini.plan.md`, `gemini.report.md`,
+  `logs/gemini/`) in the project. Delete them before committing, or keep
+  them in `.gitignore`.
+- After agy returns, verify the result yourself (run the tests, read the
+  diff) exactly as you would review a subagent's report — then continue
+  the normal review loop.
 
 ## The Task Loop
 
