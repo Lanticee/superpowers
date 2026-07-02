@@ -185,7 +185,7 @@ implementation.
 
 Use the least powerful model that can handle each role to conserve cost and increase speed.
 
-**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): delegate to Gemini 3.5 Flash via the Antigravity CLI (`agy`) — see "Dispatching to Gemini 3.5 Flash via agy" below. Most implementation tasks are mechanical when the plan is well-specified. If `agy` is unavailable on this machine, fall back to the cheapest Claude model.
+**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): delegate to Gemini 3.5 Flash via the Antigravity CLI (`agy`) — see "Dispatching to Gemini 3.5 Flash via agy" below. Most implementation tasks are mechanical when the plan is well-specified. If `agy` is unavailable or out of quota, fall back to **Sonnet** (the standard model) — never Haiku; see "agy fallback rule" below.
 
 **Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
 
@@ -214,7 +214,7 @@ implementation is transcription plus testing: dispatch that implementer to
 Gemini 3.5 Flash via agy. Single-file mechanical fixes also go to agy.
 
 **Task complexity signals (implementation tasks):**
-- Touches 1-2 files with a complete spec → Gemini 3.5 Flash via agy (fallback: cheap model)
+- Touches 1-2 files with a complete spec → Gemini 3.5 Flash via agy (fallback: Sonnet)
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
@@ -256,6 +256,22 @@ Rules for agy dispatch:
 - After agy returns, verify the result yourself (run the tests, read the
   diff) exactly as you would review a subagent's report — then continue
   the normal review loop.
+
+**agy fallback rule.** agy's quota is limited. Treat any of these as
+"agy unavailable":
+
+- `command -v agy` finds nothing
+- non-zero exit, or output/stderr mentioning quota, rate limit, resource
+  exhausted, or usage limits
+- empty output on a task that should produce one
+- timeout with no result
+
+When that happens, dispatch the task to a **Sonnet** subagent instead —
+NOT Haiku. The tasks routed to agy are exactly the ones where the cheapest
+Claude tier wastes turns (see "Turn count beats token price" above), so
+Sonnet is the correct floor. After one quota-type failure, stop trying agy
+for the rest of the session and route all subsequent cheap-tier tasks to
+Sonnet directly — do not retry agy on every task.
 
 ## The Task Loop
 
