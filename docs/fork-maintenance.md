@@ -2,6 +2,8 @@
 
 本文件說明如何讓這個 fork（`Lanticee/superpowers`）與官方上游（`obra/superpowers`）保持同步，同時保留自己的客製修改。
 
+fork 版的安裝方式請見 [fork-install.md](fork-install.md)。
+
 ## Fork 架構
 
 本地 repo 設定了兩個 remote：
