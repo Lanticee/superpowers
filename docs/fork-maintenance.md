@@ -24,6 +24,8 @@ fork 版的安裝方式請見 [fork-install.md](fork-install.md)。
 1. **Route cheap-tier subagent tasks to Gemini 3.5 Flash via agy** — 把低成本層級的 subagent 任務改走 agy（Antigravity CLI）的 Gemini 3.5 Flash
 2. **Fall back to Sonnet (not Haiku) when agy quota is exhausted** — agy 額度用完時改回退到 Sonnet 而非 Haiku
 3. **Add fork maintenance guide (Chinese)** — 這份文件本身
+4. **Add fork installation guide (Chinese)** — `docs/fork-install.md`，fork 版各 harness 安裝方式
+5. **Replace AGENTS.md symlink with a regular file** — 上游的 `AGENTS.md` 是指向 `CLAUDE.md` 的 symlink，copilot CLI 在 Windows 安裝時重建 symlink 會失敗（存取被拒 os error 5，開發人員模式也無效），改成實體檔案。**同步上游後若 `CLAUDE.md` 有更動，記得重新複製一份到 `AGENTS.md`**
 
 > 之後若新增客製 commit，記得更新這份清單，rebase 時才知道哪些是自己的修改。
 
