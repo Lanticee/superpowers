@@ -185,7 +185,7 @@ implementation.
 
 Use the least powerful model that can handle each role to conserve cost and increase speed.
 
-**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): delegate to Gemini 3.5 Flash via the Antigravity CLI (`agy`) — see "Dispatching to Gemini 3.5 Flash via agy" below. Most implementation tasks are mechanical when the plan is well-specified. If `agy` is unavailable or out of quota, fall back to **Sonnet** (the standard model) — never Haiku; see "agy fallback rule" below.
+**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): delegate to **Sonnet** — never Haiku (the cheapest tier wastes turns on multi-step work; see "Turn count beats token price" below). Do NOT dispatch implementation to agy; it is reserved for second opinions — see "Second opinions via agy (Gemini Flash)" below.
 
 **Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
 
@@ -211,78 +211,48 @@ turns on multi-step work — costing more overall. Use a mid-tier model as the
 floor for reviewers and for implementers working from prose descriptions.
 When the task's plan text contains the complete code to write, the
 implementation is transcription plus testing: dispatch that implementer to
-Gemini Flash via agy. Single-file mechanical fixes also go to agy.
+Sonnet. Single-file mechanical fixes also go to Sonnet.
 
 **Task complexity signals (implementation tasks):**
-- Touches 1-2 files with a complete spec → Gemini Flash via agy (fallback: Sonnet)
+- Touches 1-2 files with a complete spec → Sonnet
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
-## Dispatching to Gemini Flash via agy
+## Second opinions via agy (Gemini Flash)
 
-For cheap-tier tasks, shell out to the Antigravity CLI instead of spawning a
-cheap Claude subagent. Check availability once per session with `command -v agy`.
+agy is NOT a cheap-labor tier. Headless (`--print`) agy auto-denies its own
+file-read tools, so you must Read files yourself and embed their contents in
+the prompt — nothing is saved on reads — and its output must be verified
+against the source anyway. Use agy only when a **cross-model second opinion**
+adds value: reviewing or cross-checking a few files from a different model
+family, or when the user explicitly asks for Gemini's take.
 
-`--model` takes the full display name with the effort suffix, quoted —
-`"Gemini 3.6 Flash (Medium)"`. Short ids (`gemini-3.6-flash`) additionally
-require `--effort`; prefer the display name.
-
-**Read-only tasks** (review a diff, analyze a file, summarize): in `--print`
-mode agy auto-denies its own file-read tools (permission prompts need a TTY),
-so do NOT pass bare file paths — Read the files yourself and embed the
-relevant contents in the prompt:
+Never dispatch implementation (file-writing) tasks to agy: it would need
+`--dangerously-skip-permissions`, which Claude Code's Bash permission
+classifier blocks; do not try to work around that. Implementation always
+goes to Claude subagents per the routing above.
 
 ```bash
 agy --print "<self-contained prompt with file CONTENTS embedded>" \
   --model "Gemini 3.6 Flash (Medium)" --print-timeout 5m < /dev/null
 ```
 
-**Implementation tasks** (writing/editing files) require
-`--dangerously-skip-permissions`, which Claude Code's Bash permission
-classifier blocks by default. Only dispatch implementation tasks to agy when
-the user has added an allow rule for it in settings (`permissions.allow`);
-otherwise treat agy as unavailable for implementation and fall back to a
-Sonnet subagent — do not try to work around the classifier.
-
-```bash
-agy --print "<task prompt>" --add-dir "<absolute project dir>" \
-  --dangerously-skip-permissions \
-  --model "Gemini 3.6 Flash (Medium)" --print-timeout 10m < /dev/null
-```
-
 Rules for agy dispatch:
 
+- Check availability once per session with `command -v agy`.
+- `--model` takes the full display name with the effort suffix, quoted —
+  `"Gemini 3.6 Flash (Medium)"`. Short ids (`gemini-3.6-flash`) additionally
+  require `--effort`; prefer the display name.
 - **Always redirect stdin from /dev/null** — agy hangs forever in non-TTY
   environments otherwise.
-- The prompt must be fully self-contained: task spec, embedded file
-  contents, and the complete code from the plan when it exists. agy shares
-  no context with your session.
-- `--dangerously-skip-permissions` (when allowed) is acceptable here because
-  the task is scoped, the plan is explicit, and every result goes through
-  the normal review loop before merging. Never use it for tasks touching
-  secrets, CI config, or anything outside the project directory.
-- agy leaves work artifacts (`gemini.plan.md`, `gemini.report.md`,
-  `logs/gemini/`) in the project. Delete them before committing, or keep
-  them in `.gitignore`.
-- After agy returns, verify the result yourself (run the tests, read the
-  diff) exactly as you would review a subagent's report — then continue
-  the normal review loop.
-
-**agy fallback rule.** agy's quota is limited. Treat any of these as
-"agy unavailable":
-
-- `command -v agy` finds nothing
-- non-zero exit, or output/stderr mentioning quota, rate limit, resource
-  exhausted, or usage limits
-- empty output on a task that should produce one
-- timeout with no result
-
-When that happens, dispatch the task to a **Sonnet** subagent instead —
-NOT Haiku. The tasks routed to agy are exactly the ones where the cheapest
-Claude tier wastes turns (see "Turn count beats token price" above), so
-Sonnet is the correct floor. After one quota-type failure, stop trying agy
-for the rest of the session and route all subsequent cheap-tier tasks to
-Sonnet directly — do not retry agy on every task.
+- The prompt must be fully self-contained: task spec plus embedded file
+  contents. agy shares no context with your session and cannot read files.
+- Verify agy's claims against the source before relaying them — treat its
+  answer as one reviewer's opinion, not ground truth.
+- If agy is unavailable (`command -v agy` finds nothing, quota/rate-limit
+  errors, empty output, or timeout), skip the second opinion or use a
+  Claude reviewer instead; after one quota-type failure, stop trying agy
+  for the rest of the session.
 
 ## The Task Loop
 
