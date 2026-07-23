@@ -220,12 +220,11 @@ Sonnet. Single-file mechanical fixes also go to Sonnet.
 
 ## Second opinions via agy (Gemini Flash)
 
-agy is NOT a cheap-labor tier. Headless (`--print`) agy auto-denies its own
-file-read tools, so you must Read files yourself and embed their contents in
-the prompt — nothing is saved on reads — and its output must be verified
-against the source anyway. Use agy only when a **cross-model second opinion**
-adds value: reviewing or cross-checking a few files from a different model
-family, or when the user explicitly asks for Gemini's take.
+agy is NOT a cheap-labor tier — its output must be verified against the
+source anyway, so it saves no review effort. Use agy only when a
+**cross-model second opinion** adds value: reviewing or cross-checking files
+from a different model family, or when the user explicitly asks for
+Gemini's take.
 
 Never dispatch implementation (file-writing) tasks to agy: it would need
 `--dangerously-skip-permissions`, which Claude Code's Bash permission
@@ -233,7 +232,8 @@ classifier blocks; do not try to work around that. Implementation always
 goes to Claude subagents per the routing above.
 
 ```bash
-agy --print "<self-contained prompt with file CONTENTS embedded>" \
+agy --print "<self-contained prompt with file paths>" \
+  --add-dir "<absolute project dir>" --mode plan \
   --model "Gemini 3.6 Flash (Medium)" --print-timeout 5m < /dev/null
 ```
 
@@ -245,8 +245,13 @@ Rules for agy dispatch:
   require `--effort`; prefer the display name.
 - **Always redirect stdin from /dev/null** — agy hangs forever in non-TTY
   environments otherwise.
-- The prompt must be fully self-contained: task spec plus embedded file
-  contents. agy shares no context with your session and cannot read files.
+- **`--mode plan` is required for headless file reads**: it auto-approves
+  agy's read-only tools (write tools stay blocked). Without it, `--print`
+  mode auto-denies every tool permission prompt. Scope visibility with
+  `--add-dir`.
+- The prompt must be fully self-contained (task spec plus absolute file
+  paths) — agy shares no context with your session. If plan mode can't be
+  used, embed file contents in the prompt instead.
 - Verify agy's claims against the source before relaying them — treat its
   answer as one reviewer's opinion, not ground truth.
 - If agy is unavailable (`command -v agy` finds nothing, quota/rate-limit
