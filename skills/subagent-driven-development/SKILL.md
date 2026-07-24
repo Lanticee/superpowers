@@ -231,13 +231,31 @@ Never dispatch implementation (file-writing) tasks to agy: it would need
 classifier blocks; do not try to work around that. Implementation always
 goes to Claude subagents per the routing above.
 
+**Preferred route — the agy-cli plugin.** If the `agy-cli` plugin is
+installed (the `agy-cli:gemini-flash` subagent appears in the agent list),
+dispatch second opinions to that subagent instead of calling agy yourself.
+Its companion runtime handles every headless-agy pitfall (stdin hang,
+plan-mode file reads, Windows argv limits, job tracking) and records each
+run as a resumable conversation:
+
+- Follow-up opinions ("dig deeper on X") should tell the subagent it is a
+  follow-up so it passes `--resume` — Gemini keeps its prior context and
+  the prompt no longer needs to be fully self-contained.
+- For a cross-model review of a whole branch, the user can also run
+  `/agy-cli:review --base <ref>` or `/agy-cli:adversarial-review` directly;
+  suggest these instead of hand-building a review prompt.
+- Long-running opinions can run in the background (`--background`, then
+  `/agy-cli:status` / `/agy-cli:result`) so the orchestrator keeps working.
+
+**Fallback — raw agy, only when the plugin is absent:**
+
 ```bash
 agy --print "<self-contained prompt with file paths>" \
   --add-dir "<absolute project dir>" --mode plan \
   --model "Gemini 3.6 Flash (Medium)" --print-timeout 5m < /dev/null
 ```
 
-Rules for agy dispatch:
+Rules for raw agy dispatch:
 
 - Check availability once per session with `command -v agy`.
 - `--model` takes the full display name with the effort suffix, quoted —
@@ -250,14 +268,19 @@ Rules for agy dispatch:
   mode auto-denies every tool permission prompt. Scope visibility with
   `--add-dir`.
 - The prompt must be fully self-contained (task spec plus absolute file
-  paths) — agy shares no context with your session. If plan mode can't be
-  used, embed file contents in the prompt instead.
+  paths) — agy shares no context with your session.
+- **Windows argv cap:** a spawned command line maxes out around 32KB —
+  embedding file contents or diffs in the `--print` argument fails with
+  `ENAMETOOLONG`. For large prompts, write the prompt to a file, add its
+  directory with a second `--add-dir`, and pass a short pointer prompt
+  ("Read the file at <path> and follow the instructions in it exactly").
 - Verify agy's claims against the source before relaying them — treat its
   answer as one reviewer's opinion, not ground truth.
 - If agy is unavailable (`command -v agy` finds nothing, quota/rate-limit
   errors, empty output, or timeout), skip the second opinion or use a
   Claude reviewer instead; after one quota-type failure, stop trying agy
-  for the rest of the session.
+  for the rest of the session. The same backoff applies when the plugin
+  subagent reports quota errors.
 
 ## The Task Loop
 
