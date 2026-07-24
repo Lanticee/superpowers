@@ -244,8 +244,10 @@ run as a resumable conversation:
 - For a cross-model review of a whole branch, the user can also run
   `/agy-cli:review --base <ref>` or `/agy-cli:adversarial-review` directly;
   suggest these instead of hand-building a review prompt.
-- Long-running opinions can run in the background (`--background`, then
-  `/agy-cli:status` / `/agy-cli:result`) so the orchestrator keeps working.
+- Long-running opinions can run in the background (`--background`) so the
+  orchestrator keeps working; when the result is actually needed, block on
+  it with `/agy-cli:status --wait` instead of polling `/agy-cli:status` /
+  `/agy-cli:result` repeatedly.
 
 **Fallback — raw agy, only when the plugin is absent:**
 
@@ -276,11 +278,17 @@ Rules for raw agy dispatch:
   ("Read the file at <path> and follow the instructions in it exactly").
 - Verify agy's claims against the source before relaying them — treat its
   answer as one reviewer's opinion, not ground truth.
+- **Empty output has two distinct causes — do not treat them the same.**
+  agy exits 0 with no output when Gemini requested a tool that headless
+  mode auto-denies (its stderr says a "command" permission was required):
+  that is a prompt problem, not an agy problem — rephrase the task as
+  read-only analysis (no command execution) and retry once. Empty output
+  alongside quota/rate-limit wording is a quota failure — see below.
 - If agy is unavailable (`command -v agy` finds nothing, quota/rate-limit
-  errors, empty output, or timeout), skip the second opinion or use a
-  Claude reviewer instead; after one quota-type failure, stop trying agy
-  for the rest of the session. The same backoff applies when the plugin
-  subagent reports quota errors.
+  errors, or timeout), skip the second opinion or use a Claude reviewer
+  instead; after one quota-type failure, stop trying agy for the rest of
+  the session. The same backoff applies when the plugin subagent reports
+  quota errors.
 
 ## The Task Loop
 
