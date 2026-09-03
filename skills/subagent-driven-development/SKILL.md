@@ -254,15 +254,15 @@ run as a resumable conversation:
 ```bash
 agy --print "<self-contained prompt with file paths>" \
   --add-dir "<absolute project dir>" --mode plan \
-  --model "Gemini 3.7 Flash (High)" --print-timeout 5m < /dev/null
+  --model "Gemini 3.8 Flash (High)" --print-timeout 5m < /dev/null
 ```
 
 Rules for raw agy dispatch:
 
 - Check availability once per session with `command -v agy`.
 - `--model` takes the full display name with the effort suffix, quoted —
-  `"Gemini 3.7 Flash (High)"`. The short ids `agy models` prints already carry
-  the effort (`gemini-3.7-flash-high`) and need no separate `--effort`; prefer
+  `"Gemini 3.8 Flash (High)"`. The short ids `agy models` prints already carry
+  the effort (`gemini-3.8-flash-high`) and need no separate `--effort`; prefer
   the display name. Run `agy models` to see what the account currently offers.
 - **Always redirect stdin from /dev/null** — agy hangs forever in non-TTY
   environments otherwise.
