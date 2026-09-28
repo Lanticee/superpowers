@@ -19,13 +19,31 @@ fork 版的安裝方式請見 [fork-install.md](fork-install.md)。
 
 ## 本地客製 commit
 
-目前墊在上游之上的修改：
+目前墊在上游之上的修改，依用途分組（`git log --oneline upstream/main..main` 可看完整 commit 列表）：
 
-1. **Route cheap-tier subagent tasks to Gemini 3.5 Flash via agy** — 把低成本層級的 subagent 任務改走 agy（Antigravity CLI）的 Gemini 3.5 Flash
-2. **Fall back to Sonnet (not Haiku) when agy quota is exhausted** — agy 額度用完時改回退到 Sonnet 而非 Haiku
-3. **Add fork maintenance guide (Chinese)** — 這份文件本身
-4. **Add fork installation guide (Chinese)** — `docs/fork-install.md`，fork 版各 harness 安裝方式
-5. **Replace AGENTS.md symlink with a regular file** — 上游的 `AGENTS.md` 是指向 `CLAUDE.md` 的 symlink，copilot CLI 在 Windows 安裝時重建 symlink 會失敗（存取被拒 os error 5，開發人員模式也無效），改成實體檔案。**同步上游後若 `CLAUDE.md` 有更動，記得重新複製一份到 `AGENTS.md`**
+### 1. Subagent 模型路由與 agy 第二意見（`skills/subagent-driven-development/SKILL.md`）
+
+- **實作任務一律交給 Sonnet** — 機械性實作與單檔修正走 Sonnet，不用 Haiku（最便宜的層級在多步驟工作上會多耗 2-3 倍回合）
+- **agy（Gemini Flash）只當跨模型第二意見** — 不派實作任務給 agy（需要 `--dangerously-skip-permissions`，會被 Claude Code 的權限分類器擋下）
+- **優先走 agy-cli plugin** — 有安裝時改派給 `agy-cli:gemini-flash` subagent；沒有才用 raw `agy --print ... --mode plan`
+- **raw agy 的操作規則** — stdin 導向 `/dev/null`、`--mode plan` 才能讀檔、Windows argv 32KB 上限、空輸出的兩種成因、額度錯誤後整個 session 停用
+- **raw agy 的模型名稱** — 目前指定 `"Gemini 3.8 Flash (High)"`。Gemini 出新版時要跟著改，可用 `agy models` 查帳號目前可用的模型
+
+這組是逐步演進的（最早是把 cheap-tier 任務整個交給 Gemini 3.5 Flash，後來改成只做第二意見），rebase 時若上游改到 Model Selection 段落，以上述最終行為為準解衝突。
+
+### 2. 中文文件
+
+- **`docs/fork-maintenance.md`** — 這份文件本身
+- **`docs/fork-install.md`** — fork 版各 harness 安裝方式
+
+### 3. 暫時性除錯內容：`testplugin/`
+
+- 為了排查 copilot CLI 安裝失敗，用 bisect 方式逐步縮減的測試 plugin（`Add minimal test plugin…` 與一串 `test: bisect - …` commit）
+- 內容是舊版 repo 的部分複本，不會被主 plugin 使用。**排查結束後可整組移除**，移除前確認沒有其他地方引用
+
+### 已不再需要的客製
+
+- **Replace AGENTS.md symlink with a regular file** — 原本因為上游的 `AGENTS.md` 是指向 `CLAUDE.md` 的 symlink，copilot CLI 在 Windows 安裝時重建 symlink 會失敗而改成實體檔。上游 v6.4.1 起已刪除 `CLAUDE.md`、`AGENTS.md` 本身就是一般檔案，這個修改已無作用（commit 仍在歷史中，只剩本文件的說明變更）
 
 > 之後若新增客製 commit，記得更新這份清單，rebase 時才知道哪些是自己的修改。
 
